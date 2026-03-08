@@ -39,14 +39,16 @@ def decrypt_aes(encrypted_text, key):
 def encrypt_des(text, key):
     cipher = DES.new(key, DES.MODE_EAX)
     ciphertext, tag = cipher.encrypt_and_digest(text.encode())
-    return base64.b64encode(cipher.nonce + ciphertext).decode()
+    return base64.b64encode(cipher.nonce+tag+ ciphertext).decode()
 
 def decrypt_des(encrypted_text, key):
     data = base64.b64decode(encrypted_text)
     nonce = data[:8]
-    ciphertext = data[8:]
+    tag=data[8:16]
+    ciphertext = data[16:]
     cipher = DES.new(key, DES.MODE_EAX, nonce=nonce)
-    return cipher.decrypt(ciphertext).decode()
+    decrypted=cipher.decrypt_and_verify(ciphertext,tag)
+    return decrypted.decode()
 
 # ---------------- RSA (Session Persistent) ----------------
 if "rsa_key" not in st.session_state:
