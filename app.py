@@ -22,41 +22,54 @@ def generate_key(length):
     characters = string.ascii_letters + string.digits
     return ''.join(secrets.choice(characters) for _ in range(length))
 
-# ---------------- AES ----------------
+# ---------------- AES FUNCTIONS ----------------
 def encrypt_aes(text, key):
     cipher = AES.new(key, AES.MODE_EAX)
     ciphertext, tag = cipher.encrypt_and_digest(text.encode())
-    return base64.b64encode(cipher.nonce + ciphertext).decode()
+
+    encrypted = cipher.nonce + tag + ciphertext
+    return base64.b64encode(encrypted).decode()
 
 def decrypt_aes(encrypted_text, key):
     data = base64.b64decode(encrypted_text)
-    nonce = data[:16]
-    ciphertext = data[16:]
-    cipher = AES.new(key, AES.MODE_EAX, nonce=nonce)
-    return cipher.decrypt(ciphertext).decode()
 
-# ---------------- DES ----------------
+    nonce = data[:16]
+    tag = data[16:32]
+    ciphertext = data[32:]
+
+    cipher = AES.new(key, AES.MODE_EAX, nonce=nonce)
+    decrypted = cipher.decrypt_and_verify(ciphertext, tag)
+
+    return decrypted.decode()
+
+# ---------------- DES FUNCTIONS ----------------
 def encrypt_des(text, key):
     cipher = DES.new(key, DES.MODE_EAX)
     ciphertext, tag = cipher.encrypt_and_digest(text.encode())
-    return base64.b64encode(cipher.nonce+tag+ ciphertext).decode()
+
+    encrypted = cipher.nonce + tag + ciphertext
+    return base64.b64encode(encrypted).decode()
 
 def decrypt_des(encrypted_text, key):
     data = base64.b64decode(encrypted_text)
+
     nonce = data[:8]
-    tag=data[8:16]
+    tag = data[8:16]
     ciphertext = data[16:]
+
     cipher = DES.new(key, DES.MODE_EAX, nonce=nonce)
-    decrypted=cipher.decrypt_and_verify(ciphertext,tag)
+    decrypted = cipher.decrypt_and_verify(ciphertext, tag)
+
     return decrypted.decode()
 
-# ---------------- RSA (Session Persistent) ----------------
+# ---------------- RSA KEYS ----------------
 if "rsa_key" not in st.session_state:
     st.session_state.rsa_key = RSA.generate(2048)
 
 public_key = st.session_state.rsa_key.publickey()
 private_key = st.session_state.rsa_key
 
+# ---------------- RSA FUNCTIONS ----------------
 def encrypt_rsa(text):
     cipher = PKCS1_OAEP.new(public_key)
     encrypted = cipher.encrypt(text.encode())
@@ -67,32 +80,37 @@ def decrypt_rsa(encrypted_text):
     decrypted = cipher.decrypt(base64.b64decode(encrypted_text))
     return decrypted.decode()
 
-# ---------------- UI SECTION ----------------
-algorithm = st.selectbox("Select Encryption Algorithm", ["AES", "DES", "RSA"])
+# ---------------- UI ----------------
+algorithm = st.selectbox(
+    "Select Encryption Algorithm",
+    ["AES", "DES", "RSA"]
+)
 
 st.markdown("### Enter Text")
 text = st.text_area("", height=120)
 
 st.markdown("---")
 
-# ---------------- AES SECTION ----------------
+# ---------------- AES UI ----------------
 if algorithm == "AES":
 
     st.subheader("AES Encryption (128-bit)")
 
     col1, col2 = st.columns([3,1])
+
     with col1:
         key = st.text_input("Enter 16-character key", type="password")
+
     with col2:
-        if st.button("Generate Key"):
+        if st.button("Generate AES Key"):
             generated = generate_key(16)
-            st.success(f"Generated Key: {generated}")
+            st.success(generated)
             key = generated
 
     col3, col4 = st.columns(2)
 
     with col3:
-        if st.button("Encrypt"):
+        if st.button("Encrypt AES"):
             if len(key) != 16:
                 st.error("Key must be exactly 16 characters!")
             else:
@@ -101,7 +119,7 @@ if algorithm == "AES":
                 st.code(result)
 
     with col4:
-        if st.button("Decrypt"):
+        if st.button("Decrypt AES"):
             if len(key) != 16:
                 st.error("Key must be exactly 16 characters!")
             else:
@@ -112,24 +130,26 @@ if algorithm == "AES":
                 except:
                     st.error("Invalid key or encrypted text!")
 
-# ---------------- DES SECTION ----------------
+# ---------------- DES UI ----------------
 elif algorithm == "DES":
 
     st.subheader("DES Encryption")
 
     col1, col2 = st.columns([3,1])
+
     with col1:
         key = st.text_input("Enter 8-character key", type="password")
+
     with col2:
-        if st.button("Generate Key"):
+        if st.button("Generate DES Key"):
             generated = generate_key(8)
-            st.success(f"Generated Key: {generated}")
+            st.success(generated)
             key = generated
 
     col3, col4 = st.columns(2)
 
     with col3:
-        if st.button("Encrypt"):
+        if st.button("Encrypt DES"):
             if len(key) != 8:
                 st.error("Key must be exactly 8 characters!")
             else:
@@ -138,7 +158,7 @@ elif algorithm == "DES":
                 st.code(result)
 
     with col4:
-        if st.button("Decrypt"):
+        if st.button("Decrypt DES"):
             if len(key) != 8:
                 st.error("Key must be exactly 8 characters!")
             else:
@@ -149,11 +169,11 @@ elif algorithm == "DES":
                 except:
                     st.error("Invalid key or encrypted text!")
 
-# ---------------- RSA SECTION ----------------
+# ---------------- RSA UI ----------------
 elif algorithm == "RSA":
 
     st.subheader("RSA Public-Key Encryption (2048-bit)")
-    st.info("Public Key is used for encryption. Private Key is used for decryption.")
+    st.info("Public Key is used for encryption and Private Key for decryption.")
 
     st.text_area("Public Key", public_key.export_key().decode(), height=150)
     st.text_area("Private Key", private_key.export_key().decode(), height=150)
@@ -161,13 +181,13 @@ elif algorithm == "RSA":
     col5, col6 = st.columns(2)
 
     with col5:
-        if st.button("Encrypt"):
+        if st.button("Encrypt RSA"):
             result = encrypt_rsa(text)
             st.success("Encrypted Text:")
             st.code(result)
 
     with col6:
-        if st.button("Decrypt"):
+        if st.button("Decrypt RSA"):
             try:
                 result = decrypt_rsa(text)
                 st.success("Decrypted Text:")
