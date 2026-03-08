@@ -5,6 +5,7 @@ from Crypto.Cipher import PKCS1_OAEP
 import base64
 import secrets
 import string
+from Crypto.Util.Padding import pad,unpad
 
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(
@@ -43,22 +44,29 @@ def decrypt_aes(encrypted_text, key):
     return decrypted.decode()
 
 # ---------------- DES FUNCTIONS ----------------
-def encrypt_des(text, key):
-    cipher = DES.new(key, DES.MODE_EAX)
-    ciphertext, tag = cipher.encrypt_and_digest(text.encode())
 
-    encrypted = cipher.nonce + tag + ciphertext
+def encrypt_des(text, key):
+    key = key[:8]  # ensure 8 bytes
+    cipher = DES.new(key, DES.MODE_CBC)
+    padded_text = pad(text.encode(), DES.block_size)
+
+    ciphertext = cipher.encrypt(padded_text)
+
+    encrypted = cipher.iv + ciphertext
     return base64.b64encode(encrypted).decode()
 
+
 def decrypt_des(encrypted_text, key):
+    key = key[:8]
+
     data = base64.b64decode(encrypted_text)
 
-    nonce = data[:8]
-    tag = data[8:16]
-    ciphertext = data[16:]
+    iv = data[:8]
+    ciphertext = data[8:]
 
-    cipher = DES.new(key, DES.MODE_EAX, nonce=nonce)
-    decrypted = cipher.decrypt_and_verify(ciphertext, tag)
+    cipher = DES.new(key, DES.MODE_CBC, iv=iv)
+
+    decrypted = unpad(cipher.decrypt(ciphertext), DES.block_size)
 
     return decrypted.decode()
 
@@ -198,3 +206,4 @@ elif algorithm == "RSA":
 # ---------------- FOOTER ----------------
 st.markdown("---")
 st.markdown("🔐 Developed as a Cybersecurity Internship Project | 2026")
+
